@@ -1,12 +1,11 @@
 #include "ferry_sim.h"
-#include <assert.h>
+#include <assert.h> 
 
 // Inicializa una cola de vehículos dejándola vacía.
  
 void cola_init(ColaVehiculo* q) {
     q->head = q->tail = q->size = 0;
 }
-
 
  // Retorna 1 si la cola está vacía, 0 si tiene elementos.
  

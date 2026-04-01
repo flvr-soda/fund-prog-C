@@ -1,3 +1,6 @@
+Proyecto Fundamentos de programación 
+Modelo 2025-2 rev01
+
 Estrategia general
 
     Estructuras: Usar arreglos estáticos para modelar colas, ferrys, y vehículos (dimensiones máximas razonables calculadas o acotadas de acuerdo a la simulación de un día).
