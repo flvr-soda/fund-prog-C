@@ -1,3 +1,6 @@
+#ifndef LECTURA_H
+#define LECTURA_H
+
 #include "ferry_sim.h"
 #include <stdio.h>
 #include <string.h>
@@ -8,25 +11,29 @@
     lista: arreglo donde se almacenarán los vehículos leídos.
     n: puntero a entero donde se guardará la cantidad de vehículos leídos.
     orden: arreglo de tamaño 3 para guardar el orden de los ferrys.
-    fname: nombre del archivo de entrada.
   Retorna:
     0 si fue exitoso, un número negativo en caso de error.
  */
-int leer_vehiculos(Vehiculo lista[], int *n, char orden[], const char* fname) {
-    FILE *f = fopen(fname, "r");
-    if (!f) return -1;          // No se pudo abrir el archivo
+int leer_vehiculos(Vehiculo lista[], int *n, int orden[]) {
+    FILE *in = fopen("proy1.in", "r");
+    if (!in) return -1;          // No se pudo abrir el archivo
+    
     int i = 0;
     char line[128];
 
     // Lee la primera línea, que indica el orden de embarque de los ferrys
-    if (!fgets(line, sizeof(line), f)) return -2;
+    if (!fgets(line, sizeof(line), in)) {
+        fclose(in);
+        return -2;
+    }
+    
     int fo[3];
     sscanf(line, "%d %d %d", &fo[0], &fo[1], &fo[2]);
     for (int j=0; j<3; j++)
         orden[j] = fo[j];
 
     // Lee las siguientes líneas, cada una representa un vehículo
-    while (fgets(line, sizeof(line), f)) {
+    while (fgets(line, sizeof(line), in)) {
         Vehiculo v;
         int c;
         // Extrae todos los datos del vehículo desde la línea
@@ -37,6 +44,15 @@ int leer_vehiculos(Vehiculo lista[], int *n, char orden[], const char* fname) {
         lista[i++] = v;             // Agrega el vehículo al arreglo
     }
     *n = i;                         // Cantidad de vehículos leídos
-    fclose(f);
+    
+    fclose(in);
     return 0;
 }
+
+#endif // LECTURA_H
+
+/*
+entiendo que de esta manera se modulariza mejor el codigo?
+como cuando importamos un .py a otro en python.
+creo que asi se me hace mas legible lo que estoy haciendo
+*/ 

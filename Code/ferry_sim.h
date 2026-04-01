@@ -1,6 +1,36 @@
+#ifndef FERRY_SIM_H
+#define FERRY_SIM_H
+
 #define MAX_VEHICULOS 500        // Estimación razonable para un día (ajustable)
 #define MAX_PASAJEROS_TOTAL 1000
 #define MAX_FERRYS 3
+
+#define TIEMPO_CARGA_DESCARGA 3
+
+// bomberos, policias etc no tienen tarifas lo podriamos obviar o ponerles 0 
+// Tarifas de Pasajeros - Ferry Tradicional (Convencional)
+#define TARIFA_ADULTO_1RA_TRAD 370.00
+#define TARIFA_TERCERA_1RA_TRAD 190.50
+#define TARIFA_ADULTO_TUR_TRAD 290.00
+#define TARIFA_TERCERA_TUR_TRAD 150.50
+
+// Tarifas de Pasajeros - Ferry Express
+#define TARIFA_ADULTO_VIP_EXP 1020.00
+#define TARIFA_TERCERA_VIP_EXP 520.00
+#define TARIFA_ADULTO_EJE_EXP 620.00
+#define TARIFA_TERCERA_EJE_EXP 320.00
+
+// Tarifas de Vehículos - Ferry Tradicional
+#define TARIFA_VEH_LIVIANO_TRAD 590.00
+#define TARIFA_VEH_RUSTICO_TRAD 710.00
+#define TARIFA_VEH_MICROBUS_TRAD 850.00
+#define TARIFA_VEH_CARGA_TRAD 1200.00
+
+// Tarifas de Vehículos - Ferry Express
+#define TARIFA_VEH_LIVIANO_EXP 1090.00
+#define TARIFA_VEH_RUSTICO_EXP 1310.00
+#define TARIFA_VEH_MICROBUS_EXP 1600.00
+#define TARIFA_VEH_CARGA_EXP 2400.00
 
 typedef enum {
     FERRY_EXPRESS = 0,
@@ -28,6 +58,7 @@ typedef struct {
     char nombre[32];
     FerryTipo tipo;
     int max_vehiculos;
+    int min_vehiculos;          // 30% de capacidad requerido para zarpar
     int max_pasajeros;          // suma de todas las clases
     int max_vip_1ra;            // asientos VIP/1ra clase
     int max_ejecutiva;          // asientos ejecutiva/turista
@@ -47,3 +78,14 @@ typedef struct {
     int idx[MAX_VEHICULOS];
     int head, tail, size;
 } ColaVehiculo;
+
+// Prototipos de funciones
+void inicializar_ferrys(Ferry flota[]);
+
+// Prototipos de funciones de colas.c
+void cola_init(ColaVehiculo* q);
+int cola_vacia(const ColaVehiculo* q);
+void cola_push(ColaVehiculo* q, int idx);
+int cola_pop(ColaVehiculo* q);
+
+#endif // FERRY_SIM_H
