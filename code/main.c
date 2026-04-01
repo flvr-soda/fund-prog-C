@@ -1,3 +1,6 @@
+// 03/04/2026 Sección-08
+// Ismael Armada 31.390.408 
+// Rances Colotto 30.997.818
 #include "ferry_sim.h"
 #include "lectura.h"
 #include "colas.c"
