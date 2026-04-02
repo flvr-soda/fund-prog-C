@@ -349,18 +349,10 @@ void simular(Veh lista[], int n, int orden[3], Ferry flota[], FILE *out) {
         /* 1. Encolar vehiculos que llegan en este minuto */
         while (prox_veh < n && h_a_min(lista[prox_veh].hora) == min_act) {
             int idx = prox_veh++;
+            st.frec[tipo_v(&lista[idx])]++;      /* contar TODOS los vehiculos del dia */
             if (es_emerg(&lista[idx]))          q_push(&q_emerg, idx);
             else if (lista[idx].tipo_ferry == 0) q_push(&q_exp,   idx);
             else                                 q_push(&q_trad,  idx);
-        }
-
-        /* 2. Estadisticas de espera (se mide tras llegadas, antes de cargar) */
-        {
-            int en_espera = q_exp.size + q_trad.size + q_emerg.size;
-            if (en_espera > st.max_cola) {
-                st.max_cola = en_espera;
-                st.h_cola   = min_a_h(min_act);
-            }
         }
 
         /* 2. Carga del ferry en el muelle */
@@ -422,6 +414,15 @@ void simular(Veh lista[], int n, int orden[3], Ferry flota[], FILE *out) {
             en_muelle = q_pop(&q_muelle);
             flota[en_muelle].estado = CARGANDO;
             t_libre = min_act;
+        }
+
+        /* 3. Estadisticas de espera (se mide DESPUES de cargar del minuto actual) */
+        {
+            int en_espera = q_exp.size + q_trad.size + q_emerg.size;
+            if (en_espera > st.max_cola) {
+                st.max_cola = en_espera;
+                st.h_cola   = min_a_h(min_act);
+            }
         }
 
         /* 4. Avanza ferrys en viaje */
