@@ -1,4 +1,4 @@
-/* 03/04/2026 | Ismael Armada  31.390.408  |  Rances Colotto 30.997.818  |  Sec. 08 */
+
 
 #include <stdio.h>
 #include <stdlib.h>
