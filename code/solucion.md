@@ -7,8 +7,11 @@
 
 El programa simula, **minuto a minuto**, la carga y despacho de vehículos en los tres
 ferrys de la empresa *El Margariteño C.A.* durante un día completo (1 440 minutos).
-Todo el código reside en un único archivo `proy1.c`, sin bibliotecas externas más allá
+Todo el código reside en un único archivo `main.c`, sin bibliotecas externas más allá
 de las estándar requeridas por el enunciado.
+
+La función `main` invoca `leer_datos` → `init_flota` → abre `proy1.out` en escritura →
+`simular` → cierra el archivo de salida.
 
 ---
 
@@ -44,14 +47,14 @@ tail                 índice del próximo espacio libre
 size                 número de elementos actuales
 ```
 
-Se emplean **cuatro** colas durante la simulación:
+Se emplean **cuatro** colas durante la simulación (nombres en el código):
 
 | Cola | Contenido |
 |------|-----------|
-| `q_exp` | Vehículos esperando el ferry Express |
-| `q_trad` | Vehículos esperando un ferry Tradicional |
-| `q_emerg` | Vehículos de emergencia (prioridad absoluta) |
-| `q_muelle` | Índices de ferrys disponibles para cargar |
+| `colaExpress` | Vehículos esperando el ferry Express (`tipo_ferry == 0`) |
+| `colaTradicional` | Vehículos esperando un ferry Tradicional (`tipo_ferry == 1`) |
+| `colaEmergencias` | Vehículos de emergencia (prioridad absoluta) |
+| `colaMuelle` | Índices de ferrys en espera de turno en el muelle |
 
 La operación `q_push_f` inserta al **frente** de la cola (para los vehículos que son
 bajados del ferry por una emergencia y deben volver al principio de la fila).
@@ -76,8 +79,13 @@ Cada ferry mantiene dos grupos de campos:
 
 ### 2.4 `Stats` — Estadísticas diarias
 
-Acumula: vehículos totales, pasajeros totales, ingresos, pasajeros perdidos,
-frecuencia por tipo de vehículo y el pico de espera (cantidad + hora).
+Acumula: vehículos transportados, pasajeros transportados, ingresos, pasajeros no
+trasladados, vector `frec[]` por tipo de vehículo y el pico de espera (cantidad + hora).
+
+**Nota sobre `frec[]`:** en `simular`, el arreglo se incrementa **al llegar** cada
+vehículo al terminal y **otra vez** al contabilizar cada vehículo embarcado en un viaje
+que zarpa. El informe *“Vehículo más frecuente”* usa ese acumulado tal como está
+implementado en `rep_stats`.
 
 ---
 
@@ -132,12 +140,13 @@ Cuando llega un vehículo de emergencia (`c1 ∈ {5, 6, 7}`):
 mientras ferry lleno en vehículos:
     bajar el último vehículo normal de abordo[]
     revertir sus contadores (desembarcar_cnt)
-    reencolar al frente de su cola original (q_push_f)
-embarcar el vehículo de emergencia
+    reencolar al frente de su cola original (`q_push_f` hacia `colaExpress` o `colaTradicional`)
+embarcar el vehículo de emergencia (sin comprobar `puede_subir`)
 ```
 
-El vehículo de emergencia puede **sobrepasar** los límites de pasajeros y peso
-(overflow intencionado según el enunciado).
+El vehículo de emergencia se embarca **sin** pasar por `puede_subir`, por lo que puede
+dejar el ferry por encima de los límites de pasajeros o de peso si el enunciado lo
+requiere en ese escenario.
 
 ---
 
@@ -152,46 +161,54 @@ El ferry zarpa si se cumple **cualquiera** de estas condiciones:
 | 3 | `n_veh ≥ min_veh` **y** cola vacía |
 | 4 | `n_veh ≥ min_veh` **y** ningún vehículo en cola puede subir (`puede_subir` retorna 0 para todos) |
 
-> Un ferry **no zarpa** si hay vehículos de emergencia esperando (`q_emerg` no vacía).
+> Un ferry **no zarpa** si hay vehículos de emergencia esperando (`colaEmergencias` no vacía).
 
 ---
 
 ## 7. Bucle de simulación (`simular`)
 
+Variables principales del reloj: `minutoActual`, `minutoFin = minutoActual + 1440`,
+`minutoDisponibleCarga` (no se puede embarcar otro vehículo hasta pasados `T_CARGA`
+minutos tras el último embarque), `ferryEnMuelle` (índice del ferry en el muelle o -1).
+
 ```
-inicializar colas y reloj
-primer ferry al muelle
+inicializar colas y estadísticas (statsDia)
+llenar colaMuelle con el orden inicial de ferrys (archivo)
+primer ferry al muelle; minutoDisponibleCarga = minutoActual
 
-mientras min_act ≤ min_fin:
+mientras minutoActual ≤ minutoFin:
 
-  [1] encolar vehículos que llegan en min_act
-        emergencias → q_emerg
-        tipo_ferry=0 → q_exp
-        tipo_ferry=1 → q_trad
+  [1] Encolar vehículos cuya hora de llegada coincide con minutoActual
+        emergencias → colaEmergencias
+        tipo_ferry = 0 → colaExpress
+        tipo_ferry = 1 → colaTradicional
+        (y contar llegada en statsDia.frec[])
 
-  [2] actualizar estadística de espera máxima
+  [2] Si hay ferry en muelle y minutoActual ≥ minutoDisponibleCarga:
+        colaFerry = colaExpress o colaTradicional según tipo del ferry
+        prioridad 1: embarcar emergencia (bajando normales si el ferry está lleno en vehículos)
+        prioridad 2: si la cola correspondiente no está vacía y puede_subir, embarcar frente
+        si colaEmergencias vacía y puede_zarpar:
+            acumular estadísticas del viaje e ingresos
+            rep_viaje (stdout y proy1.out)
+            reiniciar contadores del ferry; estado EN_VIAJE; t_rest = t_ciclo
+            siguiente ferry desde colaMuelle (si hay)
 
-  [3] si hay ferry en muelle y t_libre ≤ min_act:
-        prioridad 1: embarcar emergencia (bajando normales si es necesario)
-        prioridad 2: embarcar frente de la cola del ferry
-        
-        si puede_zarpar:
-            acumular estadísticas del viaje
-            imprimir reporte del viaje
-            reiniciar contadores del ferry
-            poner ferry en EN_VIAJE con t_rest = t_ciclo
-            sacar siguiente ferry de q_muelle (si existe)
+  [2b] (rama aparte en el código) Si ferryEnMuelle < 0 y colaMuelle no está vacía:
+        asignar el siguiente ferry al muelle (no depende de haber cargado en [2])
 
-  [4] decrementar t_rest de los ferrys en viaje
-        si t_rest ≤ 0 → pasar a EN_ESPERA, encolar en q_muelle
+  [3] Estadística de espera máxima: tamaño colaExpress + colaTradicional + colaEmergencias
+      (se calcula DESPUÉS de la carga de este minuto, como en el código)
 
-  [5] condición de fin:
-        si no hay más vehículos por llegar
+  [4] Para cada ferry en EN_VIAJE: decrementar t_rest; si llega a 0 → EN_ESPERA y encolar en colaMuelle
+
+  [5] Condición de fin:
+        si ya no quedan vehículos por leer
         y las tres colas de espera están vacías
-        y el ferry en muelle no alcanza el mínimo
-          → terminar
+        y NO hay un ferry en muelle con n_veh ≥ min_veh (capaz de seguir la simulación)
+          → salir del bucle
 
-  min_act++
+  minutoActual++
 ```
 
 ---
@@ -200,7 +217,7 @@ mientras min_act ≤ min_fin:
 
 Al terminar la simulación se cuentan como `pas_perd`:
 
-1. **Vehículos en `q_emerg`, `q_exp`, `q_trad`** que nunca abordaron.
+1. **Vehículos en `colaEmergencias`, `colaExpress`, `colaTradicional`** que nunca abordaron.
 2. **Vehículos en el ferry del muelle** que no alcanzaron el mínimo para zarpar
    (el ferry quedó "a medio cargar" al acabar el día).
 
@@ -235,7 +252,8 @@ Siempre se cobra el **chofer** (clase según `tpa`). Si `c3 = 1`:
 
 ## 10. Salida
 
-Cada zarpe imprime (pantalla **y** `proy1.out`):
+Las funciones `rep_viaje` y `rep_stats` escriben en un arreglo `destinos[]` con
+`stdout` y el `FILE *` de salida. Cada zarpe imprime (pantalla **y** `proy1.out`):
 
 ```
 Carga Nro. N:
