@@ -1,4 +1,4 @@
-// 03/04/2026 | Ismael Armada  31.390.408  |  Rances Colotto 30.997.818  |  Sec. 08
+/* 03/04/2026 | Ismael Armada  31.390.408  |  Rances Colotto 30.997.818  |  Sec. 08 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -101,27 +101,40 @@ void q_push_f(Cola *q, int v) {
 
 /* ── Lectura ──────────────────────────────────────────────────────────────── */
 int leer_datos(Veh lista[], int *n, int orden[3]) {
+    /* Lee el archivo `proy1.in`.
+     * Formato:
+     *  - Primera línea: orden de inicio de carga de ferrys (1..3)
+     *  - Luego, una línea por vehículo:
+     *      cod npa npt tpa tpt P Hr ID f
+     * Donde `lista[]` guarda los vehículos tal como vienen (respetando el
+     * orden por hora de llegada, según el enunciado).
+     */
     FILE *f = fopen("proy1.in", "r");
-    char  ln[128];
-    int   i;
+    char  lineaEntrada[128];
+    int   vehiculoIdx;
+
     if (!f) return -1;
-    if (!fgets(ln, sizeof(ln), f)) { fclose(f); return -2; }
-    sscanf(ln, "%d %d %d", &orden[0], &orden[1], &orden[2]);
-    for (i = 0; i < MAX_VEH && fgets(ln, sizeof(ln), f); ) {
-        Veh v;
-        int c = sscanf(ln, "%d %d %d %d %d %d %d %s %d",
-            &v.cod, &v.npa, &v.npt, &v.tpa, &v.tpt,
-            &v.peso, &v.hora, v.placa, &v.tipo_ferry);
-        if (c == 9) lista[i++] = v;
+    if (!fgets(lineaEntrada, sizeof(lineaEntrada), f)) { fclose(f); return -2; }
+    sscanf(lineaEntrada, "%d %d %d", &orden[0], &orden[1], &orden[2]);
+
+    for (vehiculoIdx = 0;
+         vehiculoIdx < MAX_VEH && fgets(lineaEntrada, sizeof(lineaEntrada), f); ) {
+        Veh vehiculo;
+        /* `sscanf` devuelve la cantidad de campos parseados. Esperamos 9. */
+        int camposLeidos = sscanf(lineaEntrada, "%d %d %d %d %d %d %d %s %d",
+            &vehiculo.cod, &vehiculo.npa, &vehiculo.npt, &vehiculo.tpa, &vehiculo.tpt,
+            &vehiculo.peso, &vehiculo.hora, vehiculo.placa, &vehiculo.tipo_ferry);
+        if (camposLeidos == 9) lista[vehiculoIdx++] = vehiculo;
     }
-    *n = i;
+
+    *n = vehiculoIdx;
     fclose(f);
     return 0;
 }
 
 /* ── Inicializacion de la flota ───────────────────────────────────────────── */
 void init_flota(Ferry f[]) {
-    int i;
+    int ferryIdx;
     /* Lilia Concepcion — Express */
     strcpy(f[0].nombre, "Lilia Concepcion");
     f[0].tipo=EXPRESO;     f[0].id=1;
@@ -144,18 +157,22 @@ void init_flota(Ferry f[]) {
     f[2].cap_ton=80.0f;    f[2].t_ciclo=65;
 
     /* Reinicia estado dinamico */
-    for (i = 0; i < N_FERRYS; i++) {
-        f[i].n_veh=0; f[i].pas=0; f[i].pas_3ra=0;
-        f[i].vip_us=0; f[i].eje_us=0; f[i].ton_car=0.0f;
-        f[i].estado=EN_ESPERA; f[i].t_rest=0;
-        f[i].n_viajes=0; f[i].ingresos=0.0f;
+    for (ferryIdx = 0; ferryIdx < N_FERRYS; ferryIdx++) {
+        f[ferryIdx].n_veh=0; f[ferryIdx].pas=0; f[ferryIdx].pas_3ra=0;
+        f[ferryIdx].vip_us=0; f[ferryIdx].eje_us=0; f[ferryIdx].ton_car=0.0f;
+        f[ferryIdx].estado=EN_ESPERA; f[ferryIdx].t_rest=0;
+        f[ferryIdx].n_viajes=0; f[ferryIdx].ingresos=0.0f;
     }
 }
 
 /* ── Funciones auxiliares ─────────────────────────────────────────────────── */
 int   tipo_v(const Veh *v)   { return v->cod / 100; }
 int   lleva_pas(const Veh *v){ return v->cod % 10; }
-int   es_emerg(const Veh *v) { int t=tipo_v(v); return t==5||t==6||t==7; }
+int   es_emerg(const Veh *v) {
+    /* Emergencias: ambulancia (5), bomberos (6) y policial (7). */
+    int tipoVehiculo = tipo_v(v);
+    return tipoVehiculo==5||tipoVehiculo==6||tipoVehiculo==7;
+}
 float v_ton(const Veh *v)    { return tipo_v(v)==4 ? (float)v->peso : v->peso/1000.0f; }
 int   h_a_min(int hm)        { return (hm/100)*60 + hm%60; }
 int   min_a_h(int m)         { return ((m/60)%24)*100 + m%60; }
@@ -170,82 +187,97 @@ const char *nom_tipo(int t) {
 }
 
 /* Ingreso por el vehiculo (tarifa segun tipo y ferry) */
-float ing_veh(const Veh *v, TipoFerry ft) {
-    int t = tipo_v(v);
-    if (ft == EXPRESO) {
-        if (t==1||t==5||t==6||t==7) return TV_LIV_E;
-        if (t==2) return TV_RUS_E;
-        if (t==3) return TV_MIC_E;
-        if (t==4) return TV_CAR_E;
+float ing_veh(const Veh *v, TipoFerry tipoFerry) {
+    int tipoVehiculo = tipo_v(v);
+    if (tipoFerry == EXPRESO) {
+        if (tipoVehiculo==1||tipoVehiculo==5||tipoVehiculo==6||tipoVehiculo==7) return TV_LIV_E;
+        if (tipoVehiculo==2) return TV_RUS_E;
+        if (tipoVehiculo==3) return TV_MIC_E;
+        if (tipoVehiculo==4) return TV_CAR_E;
     } else {
-        if (t==1||t==5||t==6||t==7) return TV_LIV_T;
-        if (t==2) return TV_RUS_T;
-        if (t==3) return TV_MIC_T;
-        if (t==4) return TV_CAR_T;
+        if (tipoVehiculo==1||tipoVehiculo==5||tipoVehiculo==6||tipoVehiculo==7) return TV_LIV_T;
+        if (tipoVehiculo==2) return TV_RUS_T;
+        if (tipoVehiculo==3) return TV_MIC_T;
+        if (tipoVehiculo==4) return TV_CAR_T;
     }
     return 0.0f;
 }
 
 /* Ingreso por pasajeros (incluye el chofer) */
-float ing_pas(const Veh *v, TipoFerry ft) {
-    float total = 0.0f;
-    if (ft == EXPRESO) {
-        total += (v->tpa==0) ? TP_VIP_A_E : TP_EJE_A_E;        /* chofer */
+float ing_pas(const Veh *v, TipoFerry tipoFerry) {
+    float ingresoPasajeros = 0.0f;
+    if (tipoFerry == EXPRESO) {
+        ingresoPasajeros += (v->tpa==0) ? TP_VIP_A_E : TP_EJE_A_E;        /* chofer (adulto) */
         if (lleva_pas(v)) {
-            total += v->npa * ((v->tpa==0) ? TP_VIP_A_E : TP_EJE_A_E);
-            total += v->npt * ((v->tpt==0) ? TP_VIP_S_E : TP_EJE_S_E);
+            ingresoPasajeros += v->npa * ((v->tpa==0) ? TP_VIP_A_E : TP_EJE_A_E);
+            ingresoPasajeros += v->npt * ((v->tpt==0) ? TP_VIP_S_E : TP_EJE_S_E);
         }
     } else {
-        total += (v->tpa==0) ? TP_1RA_A_T : TP_TUR_A_T;         /* chofer */
+        ingresoPasajeros += (v->tpa==0) ? TP_1RA_A_T : TP_TUR_A_T;         /* chofer (adulto) */
         if (lleva_pas(v)) {
-            total += v->npa * ((v->tpa==0) ? TP_1RA_A_T : TP_TUR_A_T);
-            total += v->npt * ((v->tpt==0) ? TP_1RA_S_T : TP_TUR_S_T);
+            ingresoPasajeros += v->npa * ((v->tpa==0) ? TP_1RA_A_T : TP_TUR_A_T);
+            ingresoPasajeros += v->npt * ((v->tpt==0) ? TP_1RA_S_T : TP_TUR_S_T);
         }
     }
-    return total;
+    return ingresoPasajeros;
 }
 
 /* ── Logica de embarque ───────────────────────────────────────────────────── */
 
 /* Devuelve 1 si v cabe en el ferry (vehiculos, pasajeros, asientos, peso) */
 int puede_subir(const Ferry *f, const Veh *v) {
-    int lp = lleva_pas(v);
-    int n_pas_new = 1 + (lp ? v->npa + v->npt : 0);   /* 1=chofer */
-    int n_vip_new = (v->tpa==0 ? 1 : 0) + (lp && v->tpa==0 ? v->npa : 0)
-                                          + (lp && v->tpt==0 ? v->npt : 0);
-    int n_eje_new = (v->tpa==1 ? 1 : 0) + (lp && v->tpa==1 ? v->npa : 0)
-                                          + (lp && v->tpt==1 ? v->npt : 0);
-    if (f->n_veh   >= f->cap_veh)                          return 0;
-    if (f->pas     + n_pas_new > f->cap_pas)               return 0;
-    if (f->vip_us  + n_vip_new > f->cap_vip)               return 0;
-    if (f->eje_us  + n_eje_new > f->cap_eje)               return 0;
-    if (f->ton_car + v_ton(v)  > f->cap_ton)               return 0;
+    int llevaPasajeros = lleva_pas(v);
+
+    /* El chofer SIEMPRE cuenta como pasajero adulto (1 asiento adulto). */
+    int pasajerosTotalesNuevos = 1 + (llevaPasajeros ? v->npa + v->npt : 0);
+
+    /* Asientos por clase: VIP (tpa/tpt==0) y Ejecutiva/Turista (tpa/tpt==1). */
+    int vipNuevos = (v->tpa==0 ? 1 : 0) + (llevaPasajeros && v->tpa==0 ? v->npa : 0)
+                                          + (llevaPasajeros && v->tpt==0 ? v->npt : 0);
+    int ejeNuevos = (v->tpa==1 ? 1 : 0) + (llevaPasajeros && v->tpa==1 ? v->npa : 0)
+                                          + (llevaPasajeros && v->tpt==1 ? v->npt : 0);
+
+    /* Capacidad por vehiculos. */
+    if (f->n_veh >= f->cap_veh) return 0;
+    /* Capacidad por total de pasajeros. */
+    if (f->pas + pasajerosTotalesNuevos > f->cap_pas) return 0;
+    /* Capacidad por clase VIP. */
+    if (f->vip_us + vipNuevos > f->cap_vip) return 0;
+    /* Capacidad por clase Ejecutiva/Turista. */
+    if (f->eje_us + ejeNuevos > f->cap_eje) return 0;
+    /* Capacidad por peso total (toneladas). */
+    if (f->ton_car + v_ton(v) > f->cap_ton) return 0;
+
     return 1;
 }
 
 /* Embarca el vehiculo idx, actualizando contadores del ferry */
 void embarcar(Ferry *f, Veh lista[], int idx) {
-    const Veh *v = &lista[idx];
-    int lp = lleva_pas(v);
+    const Veh *vehiculo = &lista[idx];
+    int llevaPasajeros = lleva_pas(vehiculo);
+
     f->abordo[f->n_veh++] = idx;
-    f->ton_car += v_ton(v);
+    f->ton_car += v_ton(vehiculo);
     f->pas++;
-    if (v->tpa==0) f->vip_us++; else f->eje_us++;
-    if (lp) {
-        f->pas    += v->npa + v->npt;
-        f->pas_3ra += v->npt;
-        if (v->tpa==0) f->vip_us += v->npa; else f->eje_us += v->npa;
-        if (v->tpt==0) f->vip_us += v->npt; else f->eje_us += v->npt;
+    if (vehiculo->tpa==0) f->vip_us++; else f->eje_us++;
+
+    if (llevaPasajeros) {
+        f->pas    += vehiculo->npa + vehiculo->npt;
+        f->pas_3ra += vehiculo->npt;
+        if (vehiculo->tpa==0) f->vip_us += vehiculo->npa; else f->eje_us += vehiculo->npa;
+        if (vehiculo->tpt==0) f->vip_us += vehiculo->npt; else f->eje_us += vehiculo->npt;
     }
 }
 
 /* Revierte los contadores de un vehiculo (para bajar del ferry) */
 void desembarcar_cnt(Ferry *f, const Veh *v) {
-    int lp = lleva_pas(v);
+    int llevaPasajeros = lleva_pas(v);
+
     f->ton_car -= v_ton(v);
     f->pas--;
     if (v->tpa==0) f->vip_us--; else f->eje_us--;
-    if (lp) {
+
+    if (llevaPasajeros) {
         f->pas    -= v->npa + v->npt;
         f->pas_3ra -= v->npt;
         if (v->tpa==0) f->vip_us -= v->npa; else f->eje_us -= v->npa;
@@ -259,214 +291,294 @@ void desembarcar_cnt(Ferry *f, const Veh *v) {
  *  c) Alcanzo minimo y ningun vehiculo en cola puede abordar
  *     (por peso, pasajeros, asientos o espacio). */
 int puede_zarpar(const Ferry *f, const Cola *cola, Veh lista[]) {
-    int i;
-    if (f->n_veh >= f->cap_veh) return 1;   /* lleno en vehiculos          */
-    if (f->pas   >= f->cap_pas) return 1;   /* lleno en pasajeros          */
-    if (f->n_veh < f->min_veh)  return 0;   /* no alcanza minimo           */
-    if (q_vacia(cola))          return 1;   /* minimo OK + cola vacia      */
-    /* Minimo OK: zarpa si ningun vehiculo de la cola puede abordar */
-    for (i = 0; i < cola->size; i++) {
-        int pos = (cola->head + i) % MAX_VEH;
-        if (puede_subir(f, &lista[cola->buf[pos]]))
-            return 0;   /* al menos uno puede subir, no zarpa aun */
+    int idxVehiculoCola;
+
+    /* Condicion (a): lleno por vehiculos o por pasajeros. */
+    if (f->n_veh >= f->cap_veh) return 1;
+    if (f->pas   >= f->cap_pas) return 1;
+
+    /* Si no alcanza el mínimo de vehiculos, no puede zarpar. */
+    if (f->n_veh < f->min_veh)  return 0;
+
+    /* Condicion (b): mínimo OK + cola vacía. */
+    if (q_vacia(cola))          return 1;
+
+    /* Condicion (c): mínimo OK y ningún vehiculo de la cola puede abordar. */
+    /* Recorre la cola: si existe algún vehiculo que pueda abordar,
+     * entonces el ferry NO puede zarpar. */
+    for (idxVehiculoCola = 0; idxVehiculoCola < cola->size; idxVehiculoCola++) {
+        int posicionBuffer = (cola->head + idxVehiculoCola) % MAX_VEH;
+        if (puede_subir(f, &lista[cola->buf[posicionBuffer]])) {
+            return 0; /* al menos uno puede subir, no zarpa aun */
+        }
     }
     return 1;
 }
 
 /* ── Reporte ──────────────────────────────────────────────────────────────── */
-void rep_viaje(const Ferry *f, Veh lista[], int num_carga, FILE *out) {
-    int   i;
-    float ing = 0.0f;
-    for (i = 0; i < f->n_veh; i++) {
-        const Veh *v = &lista[f->abordo[i]];
-        ing += ing_veh(v, f->tipo) + ing_pas(v, f->tipo);
+void rep_viaje(const Ferry *f, Veh lista[], int numeroCarga, FILE *out) {
+    /* Calcula el ingreso total del viaje y reporta:
+     *  - ferry
+     *  - Nro de viaje y cantidad de vehiculos/pasajeros
+     *  - peso e ingreso
+     *  - lista de placas y tipo de vehiculos abordo
+     * El reporte se muestra en pantalla y se guarda en `proy1.out`.
+     */
+    int   idxVehiculoAbordo;
+    float ingresoViaje = 0.0f;
+    FILE *destinos[2] = { stdout, out };
+    int idxDestino;
+
+    for (idxVehiculoAbordo = 0; idxVehiculoAbordo < f->n_veh; idxVehiculoAbordo++) {
+        const Veh *vehiculoAbordo = &lista[f->abordo[idxVehiculoAbordo]];
+        ingresoViaje += ing_veh(vehiculoAbordo, f->tipo) + ing_pas(vehiculoAbordo, f->tipo);
     }
-    /* Imprime en pantalla y archivo */
-    FILE *dest[2] = { stdout, out };
-    int   d;
-    for (d = 0; d < 2; d++) {
-        if (!dest[d]) continue;
-        fprintf(dest[d], "Carga Nro. %d:\n", num_carga);
-        fprintf(dest[d], "Ferry %s\n", f->nombre);
-        fprintf(dest[d], "Viaje Nro. %d\n", f->n_viajes);
-        fprintf(dest[d], "Num. vehiculos: %d\n", f->n_veh);
-        fprintf(dest[d], "Num. pasajeros: %d (%d mayores de 60 anos)\n",
+
+    /* Imprime en pantalla (stdout) y archivo (out). */
+    for (idxDestino = 0; idxDestino < 2; idxDestino++) {
+        if (!destinos[idxDestino]) continue;
+
+        fprintf(destinos[idxDestino], "Carga Nro. %d:\n", numeroCarga);
+        fprintf(destinos[idxDestino], "Ferry %s\n", f->nombre);
+        fprintf(destinos[idxDestino], "Viaje Nro. %d\n", f->n_viajes);
+        fprintf(destinos[idxDestino], "Num. vehiculos: %d\n", f->n_veh);
+        fprintf(destinos[idxDestino], "Num. pasajeros: %d (%d mayores de 60 anos)\n",
                 f->pas, f->pas_3ra);
-        fprintf(dest[d], "Peso: %.2f toneladas\n", f->ton_car);
-        fprintf(dest[d], "Ingreso: %.0f BsF.\n", ing);
-        for (i = 0; i < f->n_veh; i++) {
-            const Veh *v = &lista[f->abordo[i]];
-            fprintf(dest[d], "ID: %-12s Tipo: %s\n", v->placa, nom_tipo(tipo_v(v)));
+        fprintf(destinos[idxDestino], "Peso: %.2f toneladas\n", f->ton_car);
+        fprintf(destinos[idxDestino], "Ingreso: %.0f BsF.\n", ingresoViaje);
+
+        for (idxVehiculoAbordo = 0; idxVehiculoAbordo < f->n_veh; idxVehiculoAbordo++) {
+            const Veh *vehiculoAbordo = &lista[f->abordo[idxVehiculoAbordo]];
+            fprintf(destinos[idxDestino], "ID: %-12s Tipo: %s\n",
+                    vehiculoAbordo->placa, nom_tipo(tipo_v(vehiculoAbordo)));
         }
-        fprintf(dest[d], "\n");
+
+        fprintf(destinos[idxDestino], "\n");
     }
 }
 
 void rep_stats(const Stats *s, FILE *out) {
-    int mejor = 1, i;
-    FILE *dest[2] = { stdout, out };
-    int   d;
-    for (i = 2; i <= 7; i++)
-        if (s->frec[i] > s->frec[mejor]) mejor = i;
-    for (d = 0; d < 2; d++) {
-        if (!dest[d]) continue;
-        fprintf(dest[d], "Estadisticas:\n");
-        fprintf(dest[d], "Total vehiculos transportados: %d\n",    s->tot_veh);
-        fprintf(dest[d], "Total pasajeros transportados: %d\n",    s->tot_pas);
-        fprintf(dest[d], "Total de ingresos: %.0f BsF.\n",         s->tot_ing);
-        fprintf(dest[d], "Num. pasajeros no trasladados: %d\n",    s->pas_perd);
-        fprintf(dest[d], "Vehiculo mas frecuente: %s\n",           nom_tipo(mejor));
-        fprintf(dest[d], "Mayor frec. vehiculos en espera: %d (a las %04d)\n",
+    /* Resume las estadísticas al final del día. */
+    int indiceTipoMasFrecuente = 1;
+    FILE *destinos[2] = { stdout, out };
+    int tipoIdx;
+    int idxDestino;
+
+    /* s->frec[t] acumula la frecuencia por tipo (t en 1..7). */
+    for (tipoIdx = 2; tipoIdx <= 7; tipoIdx++) {
+        if (s->frec[tipoIdx] > s->frec[indiceTipoMasFrecuente]) {
+            indiceTipoMasFrecuente = tipoIdx;
+        }
+    }
+    for (idxDestino = 0; idxDestino < 2; idxDestino++) {
+        if (!destinos[idxDestino]) continue;
+
+        fprintf(destinos[idxDestino], "Estadisticas:\n");
+        fprintf(destinos[idxDestino], "Total vehiculos transportados: %d\n",    s->tot_veh);
+        fprintf(destinos[idxDestino], "Total pasajeros transportados: %d\n",    s->tot_pas);
+        fprintf(destinos[idxDestino], "Total de ingresos: %.0f BsF.\n",         s->tot_ing);
+        fprintf(destinos[idxDestino], "Num. pasajeros no trasladados: %d\n",    s->pas_perd);
+        fprintf(destinos[idxDestino], "Vehiculo mas frecuente: %s\n",
+                nom_tipo(indiceTipoMasFrecuente));
+        fprintf(destinos[idxDestino], "Mayor frec. vehiculos en espera: %d (a las %04d)\n",
                 s->max_cola, s->h_cola);
     }
 }
 
 /* ── Simulacion ───────────────────────────────────────────────────────────── */
 void simular(Veh lista[], int n, int orden[3], Ferry flota[], FILE *out) {
-    Cola q_exp, q_trad, q_emerg, q_muelle;
-    Stats st;
-    int prox_veh, min_act, min_fin, en_muelle, t_libre, n_carga, fi, k;
+    /* Cola de espera para ferry Express (cola normal por tipo Express). */
+    Cola colaExpress;
+    /* Cola de espera para ferry Tradicional (cola normal por tipo Tradicional). */
+    Cola colaTradicional;
+    /* Cola de emergencias (ambulancias, bomberos y policial). */
+    Cola colaEmergencias;
+    /* Cola circular con los ferrys que están regresando (en espera de cargar). */
+    Cola colaMuelle;
 
-    q_ini(&q_exp); q_ini(&q_trad); q_ini(&q_emerg); q_ini(&q_muelle);
+    Stats statsDia;
 
-    st.tot_veh=0; st.tot_pas=0; st.pas_perd=0;
-    st.tot_ing=0.0f; st.max_cola=0; st.h_cola=0;
-    for (k=0; k<8; k++) st.frec[k]=0;
+    int vehiculoIdxProximo;
+    int minutoActual;
+    int minutoFin;
+    int ferryEnMuelle;
+    int minutoDisponibleCarga;
+    int numeroCarga;
+    int ferryIdx;
+    int idx;
 
-    /* Cola de muelle segun orden del archivo (IDs 1,2,3 → indices 0,1,2) */
-    for (k = 0; k < N_FERRYS; k++) q_push(&q_muelle, orden[k] - 1);
+    /* Inicializa colas y estadísticas. */
+    q_ini(&colaExpress);
+    q_ini(&colaTradicional);
+    q_ini(&colaEmergencias);
+    q_ini(&colaMuelle);
 
-    min_act = h_a_min(lista[0].hora);
-    min_fin = min_act + 1440;
-    prox_veh = 0;
-    n_carga  = 0;
-    en_muelle = q_pop(&q_muelle);
-    flota[en_muelle].estado = CARGANDO;
-    t_libre = min_act;
+    statsDia.tot_veh = 0;
+    statsDia.tot_pas = 0;
+    statsDia.pas_perd = 0;
+    statsDia.tot_ing = 0.0f;
+    statsDia.max_cola = 0;
+    statsDia.h_cola = 0;
+    for (idx = 0; idx < 8; idx++) statsDia.frec[idx] = 0;
 
-    while (min_act <= min_fin) {
+    /* Cola de muelle según orden de inicio del archivo (IDs 1,2,3 → indices 0,1,2) */
+    for (idx = 0; idx < N_FERRYS; idx++) q_push(&colaMuelle, orden[idx] - 1);
 
-        /* 1. Encolar vehiculos que llegan en este minuto */
-        while (prox_veh < n && h_a_min(lista[prox_veh].hora) == min_act) {
-            int idx = prox_veh++;
-            st.frec[tipo_v(&lista[idx])]++;      /* contar TODOS los vehiculos del dia */
-            if (es_emerg(&lista[idx]))          q_push(&q_emerg, idx);
-            else if (lista[idx].tipo_ferry == 0) q_push(&q_exp,   idx);
-            else                                 q_push(&q_trad,  idx);
+    minutoActual = h_a_min(lista[0].hora);
+    minutoFin = minutoActual + 1440;
+    vehiculoIdxProximo = 0;
+    numeroCarga = 0;
+
+    ferryEnMuelle = q_pop(&colaMuelle);
+    flota[ferryEnMuelle].estado = CARGANDO;
+    minutoDisponibleCarga = minutoActual;
+
+    while (minutoActual <= minutoFin) {
+        /* 1) Encolar vehículos que llegan exactamente en este minuto. */
+        while (vehiculoIdxProximo < n &&
+               h_a_min(lista[vehiculoIdxProximo].hora) == minutoActual) {
+            int vehiculoIdxLlegada = vehiculoIdxProximo++;
+            /* Contar TODOS los vehículos del día. */
+            statsDia.frec[tipo_v(&lista[vehiculoIdxLlegada])]++;
+
+            if (es_emerg(&lista[vehiculoIdxLlegada])) {
+                q_push(&colaEmergencias, vehiculoIdxLlegada);
+            } else if (lista[vehiculoIdxLlegada].tipo_ferry == 0) {
+                q_push(&colaExpress, vehiculoIdxLlegada);
+            } else {
+                q_push(&colaTradicional, vehiculoIdxLlegada);
+            }
         }
 
-        /* 2. Carga del ferry en el muelle */
-        if (en_muelle >= 0 && min_act >= t_libre) {
-            Ferry *f = &flota[en_muelle];
-            Cola  *qf = (f->tipo == EXPRESO) ? &q_exp : &q_trad;
+        /* 2) Carga del ferry que está en el muelle (si ya pasó el tiempo de carga). */
+        if (ferryEnMuelle >= 0 && minutoActual >= minutoDisponibleCarga) {
+            Ferry *ferryActual = &flota[ferryEnMuelle];
+            Cola  *colaFerry = (ferryActual->tipo == EXPRESO) ? &colaExpress : &colaTradicional;
 
             /* Prioridad 1: emergencias */
-            if (!q_vacia(&q_emerg)) {
-                int eidx = q_pop(&q_emerg);
-                /* Si ferry lleno, baja el ultimo vehiculo normal */
-                while (f->n_veh >= f->cap_veh) {
-                    int last = f->abordo[--f->n_veh];
-                    desembarcar_cnt(f, &lista[last]);
-                    Cola *dest = (lista[last].tipo_ferry==0) ? &q_exp : &q_trad;
-                    q_push_f(dest, last);
+            if (!q_vacia(&colaEmergencias)) {
+                int vehiculoEmergenciaIdx = q_pop(&colaEmergencias);
+
+                /* Si el ferry está lleno, bajar el último vehículo normal para dejar entrar la emergencia. */
+                while (ferryActual->n_veh >= ferryActual->cap_veh) {
+                    int vehiculoRetiradoIdx = ferryActual->abordo[--ferryActual->n_veh];
+                    Cola *colaDestino = (lista[vehiculoRetiradoIdx].tipo_ferry == 0)
+                        ? &colaExpress : &colaTradicional;
+                    desembarcar_cnt(ferryActual, &lista[vehiculoRetiradoIdx]);
+                    q_push_f(colaDestino, vehiculoRetiradoIdx);
                 }
-                embarcar(f, lista, eidx);
-                t_libre = min_act + T_CARGA;
+
+                embarcar(ferryActual, lista, vehiculoEmergenciaIdx);
+                minutoDisponibleCarga = minutoActual + T_CARGA;
 
             /* Prioridad 2: cola normal del ferry */
-            } else if (!q_vacia(qf)) {
-                int frente = q_ver(qf);
-                if (puede_subir(f, &lista[frente])) {
-                    q_pop(qf);
-                    embarcar(f, lista, frente);
-                    t_libre = min_act + T_CARGA;
+            } else if (!q_vacia(colaFerry)) {
+                int vehiculoFrenteIdx = q_ver(colaFerry);
+                if (puede_subir(ferryActual, &lista[vehiculoFrenteIdx])) {
+                    q_pop(colaFerry);
+                    embarcar(ferryActual, lista, vehiculoFrenteIdx);
+                    minutoDisponibleCarga = minutoActual + T_CARGA;
                 }
             }
 
-            /* Verifica zarpe (no zarpa si hay emergencias esperando) */
-            if (q_vacia(&q_emerg) && puede_zarpar(f, qf, lista)) {
-                /* Acumula estadisticas del viaje */
-                for (fi = 0; fi < f->n_veh; fi++) {
-                    Veh *v = &lista[f->abordo[fi]];
-                    st.tot_veh++;
-                    st.frec[tipo_v(v)]++;
-                    st.tot_ing += ing_veh(v, f->tipo) + ing_pas(v, f->tipo);
-                    st.tot_pas += 1 + (lleva_pas(v) ? v->npa + v->npt : 0);
+            /* Verifica zarpe (no zarpa si hay emergencias esperando). */
+            if (q_vacia(&colaEmergencias) && puede_zarpar(ferryActual, colaFerry, lista)) {
+                /* Acumula estadísticas del viaje */
+                for (ferryIdx = 0; ferryIdx < ferryActual->n_veh; ferryIdx++) {
+                    Veh *vehiculoAbordo = &lista[ferryActual->abordo[ferryIdx]];
+                    statsDia.tot_veh++;
+                    statsDia.frec[tipo_v(vehiculoAbordo)]++;
+                    statsDia.tot_ing += ing_veh(vehiculoAbordo, ferryActual->tipo)
+                                      + ing_pas(vehiculoAbordo, ferryActual->tipo);
+                    statsDia.tot_pas += 1 + (lleva_pas(vehiculoAbordo)
+                                             ? vehiculoAbordo->npa + vehiculoAbordo->npt
+                                             : 0);
                 }
-                f->n_viajes++;
-                n_carga++;
-                rep_viaje(f, lista, n_carga, out);
+
+                ferryActual->n_viajes++;
+                numeroCarga++;
+                rep_viaje(ferryActual, lista, numeroCarga, out);
 
                 /* Reinicia ferry y lo pone en viaje */
-                f->estado = EN_VIAJE;
-                f->t_rest = f->t_ciclo;
-                f->n_veh=0; f->pas=0; f->pas_3ra=0;
-                f->vip_us=0; f->eje_us=0; f->ton_car=0.0f;
+                ferryActual->estado = EN_VIAJE;
+                ferryActual->t_rest = ferryActual->t_ciclo;
+                ferryActual->n_veh = 0;
+                ferryActual->pas = 0;
+                ferryActual->pas_3ra = 0;
+                ferryActual->vip_us = 0;
+                ferryActual->eje_us = 0;
+                ferryActual->ton_car = 0.0f;
 
                 /* Siguiente ferry al muelle */
-                en_muelle = q_vacia(&q_muelle) ? -1 : q_pop(&q_muelle);
-                if (en_muelle >= 0) {
-                    flota[en_muelle].estado = CARGANDO;
-                    t_libre = min_act;
+                ferryEnMuelle = q_vacia(&colaMuelle) ? -1 : q_pop(&colaMuelle);
+                if (ferryEnMuelle >= 0) {
+                    flota[ferryEnMuelle].estado = CARGANDO;
+                    minutoDisponibleCarga = minutoActual;
                 }
             }
-        } else if (en_muelle < 0 && !q_vacia(&q_muelle)) {
-            en_muelle = q_pop(&q_muelle);
-            flota[en_muelle].estado = CARGANDO;
-            t_libre = min_act;
+        } else if (ferryEnMuelle < 0 && !q_vacia(&colaMuelle)) {
+            /* Si el muelle está vacío, toma el siguiente ferry disponible. */
+            ferryEnMuelle = q_pop(&colaMuelle);
+            flota[ferryEnMuelle].estado = CARGANDO;
+            minutoDisponibleCarga = minutoActual;
         }
 
-        /* 3. Estadisticas de espera (se mide DESPUES de cargar del minuto actual) */
+        /* 3) Estadísticas de espera (se mide DESPUÉS de cargar del minuto actual). */
         {
-            int en_espera = q_exp.size + q_trad.size + q_emerg.size;
-            if (en_espera > st.max_cola) {
-                st.max_cola = en_espera;
-                st.h_cola   = min_a_h(min_act);
+            int cantidadEnEspera = colaExpress.size + colaTradicional.size + colaEmergencias.size;
+            if (cantidadEnEspera > statsDia.max_cola) {
+                statsDia.max_cola = cantidadEnEspera;
+                statsDia.h_cola = min_a_h(minutoActual);
             }
         }
 
-        /* 4. Avanza ferrys en viaje */
-        for (fi = 0; fi < N_FERRYS; fi++) {
-            if (flota[fi].estado == EN_VIAJE && --flota[fi].t_rest <= 0) {
-                flota[fi].estado = EN_ESPERA;
-                q_push(&q_muelle, fi);
+        /* 4) Avanza ferrys que están en viaje. */
+        for (ferryIdx = 0; ferryIdx < N_FERRYS; ferryIdx++) {
+            if (flota[ferryIdx].estado == EN_VIAJE && --flota[ferryIdx].t_rest <= 0) {
+                flota[ferryIdx].estado = EN_ESPERA;
+                q_push(&colaMuelle, ferryIdx);
             }
         }
 
-        /* 5. Condicion de fin */
-        if (prox_veh >= n &&
-            q_exp.size==0 && q_trad.size==0 && q_emerg.size==0) {
-            int alguno_listo = (en_muelle >= 0 &&
-                                flota[en_muelle].n_veh >= flota[en_muelle].min_veh);
-            if (!alguno_listo) break;
+        /* 5) Condición de fin:
+         * cuando no quedan vehículos por entrar a las colas y no hay ferrys que puedan zarpar. */
+        if (vehiculoIdxProximo >= n &&
+            colaExpress.size == 0 && colaTradicional.size == 0 && colaEmergencias.size == 0) {
+            int hayFerryListo = (ferryEnMuelle >= 0 &&
+                                  flota[ferryEnMuelle].n_veh >= flota[ferryEnMuelle].min_veh);
+            if (!hayFerryListo) break;
         }
 
-        min_act++;
+        minutoActual++;
     }
 
-    /* Pasajeros no trasladados (en colas de espera sobrantes) */
+    /* Pasajeros no trasladados: en colas de espera que quedaron con vehículos al finalizar. */
     {
-        Cola *sobrantes[3] = { &q_emerg, &q_exp, &q_trad };
-        int  s;
-        for (s = 0; s < 3; s++) {
-            for (k = 0; k < sobrantes[s]->size; k++) {
-                int pos = (sobrantes[s]->head + k) % MAX_VEH;
-                Veh *v  = &lista[sobrantes[s]->buf[pos]];
-                st.pas_perd += 1 + (lleva_pas(v) ? v->npa + v->npt : 0);
+        Cola *colasSobrantes[3] = { &colaEmergencias, &colaExpress, &colaTradicional };
+        int tipoCola;
+        for (tipoCola = 0; tipoCola < 3; tipoCola++) {
+            for (idx = 0; idx < colasSobrantes[tipoCola]->size; idx++) {
+                int pos = (colasSobrantes[tipoCola]->head + idx) % MAX_VEH;
+                Veh *vehiculoPendiente = &lista[colasSobrantes[tipoCola]->buf[pos]];
+                statsDia.pas_perd += 1 + (lleva_pas(vehiculoPendiente)
+                                           ? vehiculoPendiente->npa + vehiculoPendiente->npt
+                                           : 0);
             }
         }
     }
 
-    /* Pasajeros en el ferry del muelle que no alcanzo el minimo para zarpar */
-    if (en_muelle >= 0 && flota[en_muelle].n_veh > 0) {
-        Ferry *f = &flota[en_muelle];
-        for (k = 0; k < f->n_veh; k++) {
-            const Veh *v = &lista[f->abordo[k]];
-            st.pas_perd += 1 + (lleva_pas(v) ? v->npa + v->npt : 0);
+    /* Pasajeros dentro del ferry que quedó en el muelle pero que no alcanzó el mínimo para zarpar. */
+    if (ferryEnMuelle >= 0 && flota[ferryEnMuelle].n_veh > 0) {
+        Ferry *ferryFinalMuelle = &flota[ferryEnMuelle];
+        for (idx = 0; idx < ferryFinalMuelle->n_veh; idx++) {
+            const Veh *vehiculoAbordo = &lista[ferryFinalMuelle->abordo[idx]];
+            statsDia.pas_perd += 1 + (lleva_pas(vehiculoAbordo)
+                                      ? vehiculoAbordo->npa + vehiculoAbordo->npt
+                                      : 0);
         }
     }
 
-    rep_stats(&st, out);
+    rep_stats(&statsDia, out);
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────────── */
