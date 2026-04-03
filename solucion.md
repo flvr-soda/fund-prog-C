@@ -1,5 +1,5 @@
 # Solución — Simulador de Ferrys Margarita
-**TAO207 · Sección 08 · Ismael Armada / Rances Colotto**
+
 
 ---
 
